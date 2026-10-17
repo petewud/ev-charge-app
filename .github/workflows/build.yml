@@ -1,110 +1,51 @@
 name: Build Android APK
-
 on:
   push:
   workflow_dispatch:
-
 permissions:
   contents: read
-
 jobs:
   build:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Download repository files
-        uses: actions/checkout@v4
-
-      - name: Set up Java
-        uses: actions/setup-java@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
-
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
+      - uses: android-actions/setup-android@v3
         with:
           packages: 'platform-tools'
-
       - name: Install Android build tools
         run: sdkmanager "platforms;android-34" "build-tools;34.0.0"
-
-      - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v4
+      - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.7'
-
       - name: Extract project ZIP
         shell: bash
         run: |
           python3 - <<'PY'
-          import pathlib
-          import zipfile
-
-          archives = sorted(pathlib.Path(".").glob("*.zip"))
+          import pathlib, zipfile
+          archives = list(pathlib.Path('.').glob('*.zip'))
           if len(archives) != 1:
-              raise SystemExit(
-                  "Keep exactly one project ZIP in the repository root."
-              )
-
-          with zipfile.ZipFile(archives[0]) as archive:
-              archive.extractall("unpacked")
-
-          projects = list(
-              pathlib.Path("unpacked").rglob("settings.gradle.kts")
-          )
+              raise SystemExit('Keep exactly one project ZIP in the repository root.')
+          with zipfile.ZipFile(archives[0]) as z:
+              z.extractall('unpacked')
+          projects = list(pathlib.Path('unpacked').rglob('settings.gradle.kts'))
           if len(projects) != 1:
-              raise SystemExit(
-                  "Expected exactly one Android project inside the ZIP."
-              )
-
-          pathlib.Path("project-directory.txt").write_text(
-              str(projects[0].parent.resolve())
-          )
+              raise SystemExit('Expected exactly one Android project in the ZIP.')
+          pathlib.Path('project-directory.txt').write_text(str(projects[0].parent.resolve()))
           PY
-
-      - name: Rename app to EV 80
-        shell: bash
-        run: |
-          PROJECT_DIR="$(cat project-directory.txt)"
-          python3 - "$PROJECT_DIR" <<'PY'
-          import pathlib
-          import sys
-          import xml.etree.ElementTree as ET
-
-          project = pathlib.Path(sys.argv[1])
-          manifest = project / "app/src/main/AndroidManifest.xml"
-
-          android_namespace = "http://schemas.android.com/apk/res/android"
-          ET.register_namespace("android", android_namespace)
-
-          tree = ET.parse(manifest)
-          application = tree.getroot().find("application")
-          if application is None:
-              raise SystemExit("Application element missing from manifest.")
-
-          application.set(
-              f"{{{android_namespace}}}label",
-              "EV 80"
-          )
-
-          tree.write(
-              manifest,
-              encoding="utf-8",
-              xml_declaration=True
-          )
-          PY
-
+      - name: Apply EV 80 version 1.5 changes
+        run: python3 update_ev80.py "$(cat project-directory.txt)"
       - name: Build APK
         shell: bash
         run: |
-          PROJECT_DIR="$(cat project-directory.txt)"
-          cd "$PROJECT_DIR"
+          cd "$(cat project-directory.txt)"
           gradle assembleDebug --no-daemon
-
       - name: Save APK for download
         uses: actions/upload-artifact@v4
         with:
-          name: EV-80-Charge-APK
+          name: EV-80-APK
           path: unpacked/**/app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
