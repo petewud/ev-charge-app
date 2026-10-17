@@ -33,13 +33,15 @@ jobs:
               z.extractall('unpacked')
           projects = list(pathlib.Path('unpacked').rglob('settings.gradle.kts'))
           if len(projects) != 1:
-              raise SystemExit('Expected exactly one Android project in the ZIP.')
+              raise SystemExit('Expected one Android project in the ZIP.')
           pathlib.Path('project-directory.txt').write_text(str(projects[0].parent.resolve()))
           PY
-      - name: Apply icon, menu and widget colour update
+      - name: Apply icon and widget colour update
         run: python3 update_ev80.py "$(cat project-directory.txt)"
-      - name: Apply new layout and charging target
+      - name: Apply cards and configurable target
         run: python3 update_ev80_layout.py "$(cat project-directory.txt)"
+      - name: Apply clear button, compact widget and colour picker
+        run: python3 update_ev80_v17.py "$(cat project-directory.txt)"
       - name: Build APK
         shell: bash
         run: |
