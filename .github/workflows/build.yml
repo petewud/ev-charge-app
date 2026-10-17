@@ -28,7 +28,7 @@ jobs:
           import pathlib, zipfile
           archives = list(pathlib.Path('.').glob('*.zip'))
           if len(archives) != 1:
-              raise SystemExit('Keep exactly one project ZIP in the repository root.')
+              raise SystemExit('Keep exactly one v1.4 project ZIP in the repository root.')
           with zipfile.ZipFile(archives[0]) as z:
               z.extractall('unpacked')
           projects = list(pathlib.Path('unpacked').rglob('settings.gradle.kts'))
@@ -36,8 +36,10 @@ jobs:
               raise SystemExit('Expected exactly one Android project in the ZIP.')
           pathlib.Path('project-directory.txt').write_text(str(projects[0].parent.resolve()))
           PY
-      - name: Apply EV 80 version 1.5 changes
+      - name: Apply icon, menu and widget colour update
         run: python3 update_ev80.py "$(cat project-directory.txt)"
+      - name: Apply new layout and charging target
+        run: python3 update_ev80_layout.py "$(cat project-directory.txt)"
       - name: Build APK
         shell: bash
         run: |
