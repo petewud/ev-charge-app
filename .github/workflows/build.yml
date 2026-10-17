@@ -1,0 +1,76 @@
+name: Build Android APK
+
+on:
+  push:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download repository files
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android build tools
+        run: sdkmanager "platforms;android-34" "build-tools;34.0.0"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.7'
+
+      - name: Extract project ZIP
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import pathlib
+          import zipfile
+
+          archives = sorted(pathlib.Path(".").glob("*.zip"))
+          if len(archives) != 1:
+              raise SystemExit(
+                  "Keep exactly one project ZIP in the repository root."
+              )
+
+          with zipfile.ZipFile(archives[0]) as archive:
+              archive.extractall("unpacked")
+
+          projects = list(
+              pathlib.Path("unpacked").rglob("settings.gradle.kts")
+          )
+          if len(projects) != 1:
+              raise SystemExit(
+                  "Expected exactly one Android project inside the ZIP."
+              )
+
+          pathlib.Path("project-directory.txt").write_text(
+              str(projects[0].parent.resolve())
+          )
+          PY
+
+      - name: Build APK
+        shell: bash
+        run: |
+          PROJECT_DIR="$(cat project-directory.txt)"
+          cd "$PROJECT_DIR"
+          gradle assembleDebug --no-daemon
+
+      - name: Save APK for download
+        uses: actions/upload-artifact@v4
+        with:
+          name: EV-80-Charge-APK
+          path: unpacked/**/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
