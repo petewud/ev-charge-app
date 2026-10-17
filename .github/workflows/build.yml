@@ -63,6 +63,38 @@ jobs:
           )
           PY
 
+      - name: Rename app to EV 80
+        shell: bash
+        run: |
+          PROJECT_DIR="$(cat project-directory.txt)"
+          python3 - "$PROJECT_DIR" <<'PY'
+          import pathlib
+          import sys
+          import xml.etree.ElementTree as ET
+
+          project = pathlib.Path(sys.argv[1])
+          manifest = project / "app/src/main/AndroidManifest.xml"
+
+          android_namespace = "http://schemas.android.com/apk/res/android"
+          ET.register_namespace("android", android_namespace)
+
+          tree = ET.parse(manifest)
+          application = tree.getroot().find("application")
+          if application is None:
+              raise SystemExit("Application element missing from manifest.")
+
+          application.set(
+              f"{{{android_namespace}}}label",
+              "EV 80"
+          )
+
+          tree.write(
+              manifest,
+              encoding="utf-8",
+              xml_declaration=True
+          )
+          PY
+
       - name: Build APK
         shell: bash
         run: |
